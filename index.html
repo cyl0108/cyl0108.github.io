@@ -52,16 +52,7 @@
         // 從環境變數中取得配置
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         // 如果 __firebase_config 未定義，將其設為空物件 {}，但會被後續的 React 邏輯攔截並報錯。
-        //const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-		const firebaseConfig = {
-			apiKey: "AIzaSyBOdM7pZVxknhHve33b8m4HmBs4hgmLbgQ",
-			authDomain: "closet-482eb.firebaseapp.com",
-			projectId: "closet-482eb",
-			storageBucket: "closet-482eb.firebasestorage.app",
-			messagingSenderId: "584513538498",
-			appId: "1:584513538498:web:2f900e1d69cf02aef62e5b",
-			measurementId: "G-EDV42FT5VE"
-		  };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         window.firebaseConfigData = { appId, firebaseConfig, initialAuthToken };
@@ -79,7 +70,7 @@
             if (!iconData) return <span className={className}>?</span>;
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {iconData.map((path, index) => <path key={index} d={path} />)}
+                    {iconData.map((path, index) => <path d={path} key={index} />)}
                 </svg>
             );
         };
@@ -132,7 +123,7 @@
                         return;
                     }
                     
-                    // 2. 新增檢查：如果 firebaseConfig 為空物件，則假設在本地環境運行且配置遺失。
+                    // 2. 檢查配置是否完整 (本地運行時的預期錯誤檢查)
                     if (Object.keys(firebaseConfig).length === 0) {
                         console.error("Firebase config is empty. Initialization aborted.");
                         setError("Firebase配置不完整或遺失。如果您下載後在本地運行，這表示應用程式無法連接到數據庫。請確認您是在 Canvas 環境中運行，或已手動提供有效的 Firebase Config。");
@@ -150,13 +141,24 @@
                             if (!user) {
                                 try {
                                     if (initialAuthToken) {
+                                        // 僅在有 Canvas 提供的 Token 時才使用 CustomToken 登入
                                         await signInWithCustomToken(authInstance, initialAuthToken);
                                     } else {
+                                        // 否則，使用匿名登入 (這是本地運行的預期登入方式)
                                         await signInAnonymously(authInstance);
                                     }
                                 } catch (e) {
                                     console.error("Firebase Sign-in Failed:", e);
-                                    setError("身份驗證失敗。");
+                                    
+                                    let customErrorMessage = `身份驗證失敗 (代碼: ${e.code || '未知'})。`;
+                                    
+                                    if (e.code === 'auth/operation-not-allowed') {
+                                        customErrorMessage = "身份驗證失敗：您可能在本地運行，且 **Firebase 專案中未啟用「匿名驗證 (Anonymous Auth)**」。請在 Firebase Console > Authentication > Sign-in Method 中啟用它。";
+                                    } else if (e.code === 'auth/network-request-failed') {
+                                        customErrorMessage = "身份驗證失敗：網路連接錯誤。請檢查您的網路連接。";
+                                    }
+
+                                    setError(customErrorMessage);
                                     setIsLoading(false);
                                 }
                             } else {
@@ -363,6 +365,7 @@
                         <div>
                             <label htmlFor="itemName" className="block text-sm font-medium text-gray-700">名稱 <span className="text-red-500">*</span></label>
                             <input
+                                key="item-name-input" // 這裡新增 key 屬性來穩定輸入框
                                 id="itemName" type="text" required value={newItem.name}
                                 onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
                                 placeholder="例如：藍色牛仔褲"
@@ -660,6 +663,11 @@
                         <p className="font-bold mb-2">發生錯誤：</p>
                         <p>{error}</p>
                         <p className="mt-4 text-sm text-gray-700">用戶ID: {userId || 'N/A'}</p>
+                        {error.includes("匿名驗證") && (
+                            <p className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-md text-sm text-gray-800">
+                                **操作指南：** 若要在本地運行並儲存數據，請確保您在 Firebase Console 的 **Authentication** 服務中，將 **Sign-in method** 裡的 **Anonymous** 項目設定為 **Enabled (已啟用)**。
+                            </p>
+                        )}
                     </div>
                 );
             }
@@ -696,35 +704,11 @@
             );
         };
 
-        // 渲染應用程式
-        ReactDOM.render(<App />, document.getElementById('app'));
+        // 渲染應用程式 (使用 React 18 createRoot API)
+        const container = document.getElementById('app');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
 
     </script>
-	
-	<!--
-	<script type="module">
-	  // Import the functions you need from the SDKs you need
-	  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-	  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
-	  // TODO: Add SDKs for Firebase products that you want to use
-	  // https://firebase.google.com/docs/web/setup#available-libraries
-
-	  // Your web app's Firebase configuration
-	  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-	  const firebaseConfig = {
-		apiKey: "AIzaSyBOdM7pZVxknhHve33b8m4HmBs4hgmLbgQ",
-		authDomain: "closet-482eb.firebaseapp.com",
-		projectId: "closet-482eb",
-		storageBucket: "closet-482eb.firebasestorage.app",
-		messagingSenderId: "584513538498",
-		appId: "1:584513538498:web:2f900e1d69cf02aef62e5b",
-		measurementId: "G-EDV42FT5VE"
-	  };
-
-	  // Initialize Firebase
-	  const app = initializeApp(firebaseConfig);
-	  const analytics = getAnalytics(app);
-	</script>
-	-->
 </body>
 </html>
